@@ -133,7 +133,7 @@ def _download_yarn(repository_ctx):
 
 def _prepare_node(repository_ctx):
   """Sets up BUILD files and shell wrappers for the versions of NodeJS, npm & yarn just set up.
-  
+
   Windows and other OSes set up the node runtime with different names and paths, which we hide away via
   the BUILD file here.
   In addition, we create a bash script wrapper around NPM that passes a given NPM command to all package.json labels
@@ -322,6 +322,10 @@ if %errorlevel% neq 0 exit /b %errorlevel%
     for package_json in repository_ctx.attr.package_json]), executable = True)
 
 def _nodejs_repo_impl(repository_ctx):
+  if repository_ctx.use_host_node:
+    node_path=repository_ctx.which('node')
+    repository_ctx.node_path = re.sub('/bin/node$', '', node_path)
+
   _download_node(repository_ctx)
   _download_yarn(repository_ctx)
   _prepare_node(repository_ctx)
@@ -339,6 +343,7 @@ _nodejs_repo = repository_rule(
     "yarn_repositories": attr.string_list_dict(default = YARN_REPOSITORIES),
     "node_urls": attr.string_list(default = NODE_URLS),
     "yarn_urls": attr.string_list(default = YARN_URLS),
+    "use_host_node": attr.bool(default = False),
     # TODO: change preserve_symlinks default to true all issues with preserve-symlinks resolved
     "preserve_symlinks": attr.bool(default = False),
   },
@@ -367,11 +372,12 @@ def node_repositories(
   yarn_repositories=YARN_REPOSITORIES,
   node_urls=NODE_URLS,
   yarn_urls=YARN_URLS,
+  use_host_node=False,
   preserve_symlinks=False):
   """To be run in user's WORKSPACE to install rules_nodejs dependencies.
 
   This rule sets up node, npm, and yarn.
-  
+
   The versions of these tools can be specified in one of three ways:
   - Normal Usage:
     Specify no explicit versions. This will download and use the latest NodeJS & Yarn that were available when the
@@ -428,6 +434,8 @@ def node_repositories(
 
     yarn_urls: optional; custom list of URLs to use to download Yarn.
 
+    use_host_node: optional; if true node_path will be computed from the node binary found in PATH
+
     preserve_symlinks: Turn on --node_options=--preserve-symlinks for nodejs_binary and nodejs_test rules.
       The default for this is currently False but will be switched to True in the future. When this option is
       turned on, node will preserve the symlinked path for resolves instead of the default behavior of resolving
@@ -450,6 +458,7 @@ def node_repositories(
     yarn_repositories = yarn_repositories,
     node_urls = node_urls,
     yarn_urls = yarn_urls,
+    use_host_node = use_host_node,
     preserve_symlinks = preserve_symlinks,
   )
 
